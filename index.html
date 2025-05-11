@@ -134,7 +134,6 @@
 
 <script>
   const CSV_URL = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
-
   function applyFilters() {
     const role = document.getElementById("roleFilter").value.trim().toLowerCase();
     const location = document.getElementById("locationFilter").value.trim().toLowerCase();
@@ -146,69 +145,84 @@
       return;
     }
 
-    // Hide filter while fetching data
+    // Hide filters section while fetching data
     document.getElementById("filterGroup").style.display = "none";
 
-    Papa.parse(CSV_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: function(results) {
-        const data = results.data;
+    fetch(CSV_URL)
+      .then(response => response.text())
+      .then(text => {
+        const rows = text.trim().split('\n').map(row => row.split(','));
+        const headers = rows[0].map(h => h.trim().toLowerCase()); // Normalize headers
+        const data = rows.slice(1); // Get data after header row
 
-        const filtered = data.filter(entry => {
-          const entryRole = entry.role?.toLowerCase() || "";
-          const entryLocation = entry.location?.toLowerCase() || "";
-          const entryExperience = entry.experience?.toLowerCase() || "";
-          const entryCompany = entry["company name"]?.toLowerCase() || "";
+        let filteredData = [];
 
-          return (
-            (
-              role === "all" ||
-              (role === "job seeker" && entryRole === "referrer") ||
-              (role === "referrer" && entryRole === "job seeker")
-            ) &&
-            (location === "" || entryLocation.includes(location)) &&
-            (experience === "" || entryExperience.includes(experience)) &&
-            (company === "" || entryCompany.includes(company))
-          );
-        });
+        // Apply filter logic based on the role
+        if (role === "referrer") {
+          filteredData = data.filter(row => {
+            const entry = {};
+            headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
+            
+            // Referrer is searching for job seekers' information
+            return (
+              (location === "" || entry.location.includes(location)) &&
+              (experience === "" || entry.experience === experience) &&
+              (company === "" || entry.company.includes(company))
+            );
+          });
+        } else if (role === "job seeker") {
+          filteredData = data.filter(row => {
+            const entry = {};
+            headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
 
-        displayResults(filtered, role);
-      },
-      error: function(err) {
+            // Job Seeker is searching for referrer's information
+            return (
+              (location === "" || entry.location.includes(location)) &&
+              (experience === "" || entry.experience === experience) &&
+              (company === "" || entry.company.includes(company))
+            );
+          });
+        } else {
+          // For "All" role, display all data
+          filteredData = data;
+        }
+
+        displayResults(filteredData, headers);
+      })
+      .catch(err => {
         console.error(err);
-        document.getElementById("resultsContainer").innerHTML = "❌ Failed to load data.";
-      }
-    });
+        document.getElementById("resultsContainer").innerHTML = "❌ Failed to load data. Try again.";
+      });
   }
 
-  function displayResults(data, role) {
+  function displayResults(data, headers) {
     const resultsContainer = document.getElementById("resultsContainer");
     let html = "<h3>Filtered Results</h3>";
 
     if (data.length === 0) {
       html += "<p>No matching results found.</p>";
     } else {
-      data.forEach(entry => {
+      data.forEach(row => {
         html += "<div class='result-item'>";
 
-        if (role === "referrer") {
-          // Show Job Seeker info
-          html += `<p><strong>Name:</strong> ${entry["name"] || ""}</p>`;
-          html += `<p><strong>Job Title:</strong> ${entry["job title"] || ""}</p>`;
-          html += `<p><strong>Skills:</strong> ${entry["skills"] || ""}</p>`;
-          html += `<p><strong>Experience:</strong> ${entry["experience"] || ""}</p>`;
-          html += `<p><strong>Preferred Location:</strong> ${entry["preferred location"] || ""}</p>`;
-        } else if (role === "job seeker") {
-          // Show Referrer info
-          html += `<p><strong>Referrer's Name:</strong> ${entry["referrer name"] || ""}</p>`;
-          html += `<p><strong>Company Name:</strong> ${entry["company name"] || ""}</p>`;
-          html += `<p><strong>Job Title:</strong> ${entry["job title"] || ""}</p>`;
-          html += `<p><strong>Referral Link:</strong> ${entry["referral link"] || ""}</p>`;
-          html += `<p><strong>Job Description:</strong> ${entry["job description"] || ""}</p>`;
-          html += `<p><strong>Required Skills:</strong> ${entry["required skills"] || ""}</p>`;
-          html += `<p><strong>Location:</strong> ${entry["location"] || ""}</p>`;
+        // Display fields for Referrers (if Role is Job Seeker)
+        if (document.getElementById("roleFilter").value.toLowerCase() === "referrer") {
+          html += `<p><strong>Name:</strong> ${row[headers.indexOf('name')]}</p>`;
+          html += `<p><strong>Job Title:</strong> ${row[headers.indexOf('job title')]}</p>`;
+          html += `<p><strong>Skills:</strong> ${row[headers.indexOf('skills')]}</p>`;
+          html += `<p><strong>Experience:</strong> ${row[headers.indexOf('experience')]}</p>`;
+          html += `<p><strong>Preferred Location:</strong> ${row[headers.indexOf('preferred location')]}</p>`;
+        }
+
+        // Display fields for Job Seekers (if Role is Referrer)
+        else if (document.getElementById("roleFilter").value.toLowerCase() === "job seeker") {
+          html += `<p><strong>Referrer's Name:</strong> ${row[headers.indexOf('referrer name')]}</p>`;
+          html += `<p><strong>Company Name:</strong> ${row[headers.indexOf('company name')]}</p>`;
+          html += `<p><strong>Job Title:</strong> ${row[headers.indexOf('job title')]}</p>`;
+          html += `<p><strong>Referral Link:</strong> ${row[headers.indexOf('referral link')]}</p>`;
+          html += `<p><strong>Job Description:</strong> ${row[headers.indexOf('job description')]}</p>`;
+          html += `<p><strong>Required Skills:</strong> ${row[headers.indexOf('required skills')]}</p>`;
+          html += `<p><strong>Location:</strong> ${row[headers.indexOf('location')]}</p>`;
         }
 
         html += "</div>";
@@ -228,6 +242,5 @@
     document.getElementById("resultsContainer").innerHTML = "";
   }
 </script>
-
 </body>
 </html>
