@@ -137,65 +137,55 @@
   const CSV_URL = 'https://api.allorigins.win/raw?url=https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
 
   function applyFilters() {
-    const role = document.getElementById("roleFilter").value.trim().toLowerCase();
-    const location = document.getElementById("locationFilter").value.trim().toLowerCase();
-    const experience = document.getElementById("experienceFilter").value.trim();
-    const company = document.getElementById("companyFilter").value.trim().toLowerCase();
+  const role = document.getElementById("roleFilter").value.trim().toLowerCase();
+  const location = document.getElementById("locationFilter").value.trim().toLowerCase();
+  const experience = document.getElementById("experienceFilter").value.trim();
+  const company = document.getElementById("companyFilter").value.trim().toLowerCase();
 
-    if (experience && !/^\d+$/.test(experience)) {
-      alert("Experience must be a valid number.");
-      return;
-    }
-
-    // Hide filters section while fetching data
-    document.getElementById("filterGroup").style.display = "none";
-
-    fetch(CSV_URL)
-      .then(response => response.text())
-      .then(text => {
-        const rows = text.trim().split('\n').map(row => row.split(','));
-        const headers = rows[0].map(h => h.trim().toLowerCase()); // Normalize headers
-        const data = rows.slice(1); // Get data after header row
-
-        let filteredData = [];
-
-        // Apply filter logic based on the role
-        if (role === "referrer") {
-          filteredData = data.filter(row => {
-            const entry = {};
-            headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
-            
-            // Referrer is searching for job seekers' information
-            return (
-              (location === "" || entry.location.includes(location)) &&
-              (experience === "" || entry.experience === experience) &&
-              (company === "" || entry.company.includes(company))
-            );
-          });
-        } else if (role === "job seeker") {
-          filteredData = data.filter(row => {
-            const entry = {};
-            headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
-
-            // Job Seeker is searching for referrer's information
-            return (
-              (location === "" || entry.location.includes(location)) &&
-              (experience === "" || entry.experience === experience) &&
-              (company === "" || entry.company.includes(company))
-            );
-          });
-        } else {
-          // For "All" role, display all data
-          filteredData = data;
-        }
-
-        displayResults(filteredData, headers);
-      })
-      .catch(err => {
-        console.error(err);
-        document.getElementById("resultsContainer").innerHTML = "❌ Failed to load data. Try again.";
-      });
+  // Validate if experience is a valid number (if entered)
+  if (experience && !/^\d+$/.test(experience)) {
+    alert("Experience must be a valid number.");
+    return;
   }
+
+  // Hide the filter group while fetching data
+  document.getElementById("filterGroup").style.display = "none";
+
+  fetch(CSV_URL)
+    .then(response => response.text())
+    .then(text => {
+      const rows = text.trim().split('\n').map(row => row.split(','));
+      const headers = rows[0].map(h => h.trim().toLowerCase());  // Normalize headers to lowercase
+      const data = rows.slice(1);  // Get data excluding header row
+
+      console.log("Fetched Data:", data);  // Log fetched data
+      console.log("Headers:", headers);    // Log headers
+
+      let filteredData = [];
+
+      // Filter the data based on available filters
+      filteredData = data.filter(row => {
+        const entry = {};
+        headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
+
+        return (
+          (location === "" || entry.location.includes(location)) &&
+          (experience === "" || entry.experience.includes(experience)) &&
+          (company === "" || entry.company.includes(company)) &&
+          (role === "" || entry.role === role)  // Apply the role filter (if selected)
+        );
+      });
+
+      console.log("Filtered Data:", filteredData);  // Log filtered data
+
+      displayResults(filteredData, headers);
+    })
+    .catch(err => {
+      console.error("Error fetching CSV:", err);
+      document.getElementById("resultsContainer").innerHTML = "❌ Failed to load data. Try again.";
+    });
+}
+
 
   function displayResults(data, headers) {
     const resultsContainer = document.getElementById("resultsContainer");
