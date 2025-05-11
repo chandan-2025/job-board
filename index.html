@@ -103,6 +103,8 @@
       }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
 </head>
 <body>
 
@@ -130,117 +132,102 @@
 
   </div>
 
-  <script>
-    const CSV_URL = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
+<script>
+  const CSV_URL = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
 
-    function applyFilters() {
-      const role = document.getElementById("roleFilter").value.trim().toLowerCase();
-      const location = document.getElementById("locationFilter").value.trim().toLowerCase();
-      const experience = document.getElementById("experienceFilter").value.trim();
-      const company = document.getElementById("companyFilter").value.trim().toLowerCase();
+  function applyFilters() {
+    const role = document.getElementById("roleFilter").value.trim().toLowerCase();
+    const location = document.getElementById("locationFilter").value.trim().toLowerCase();
+    const experience = document.getElementById("experienceFilter").value.trim();
+    const company = document.getElementById("companyFilter").value.trim().toLowerCase();
 
-      if (experience && !/^\d+$/.test(experience)) {
-        alert("Experience must be a valid number.");
-        return;
-      }
+    if (experience && !/^\d+$/.test(experience)) {
+      alert("Experience must be a valid number.");
+      return;
+    }
 
-      // Hide filters section while fetching data
-      document.getElementById("filterGroup").style.display = "none";
+    // Hide filter while fetching data
+    document.getElementById("filterGroup").style.display = "none";
 
-      fetch(CSV_URL)
-        .then(response => response.text())
-        .then(text => {
-          const rows = text.trim().split('\n').map(row => row.split(','));
-          const headers = rows[0].map(h => h.trim().toLowerCase());
-          const data = rows.slice(1);
+    Papa.parse(CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        const data = results.data;
 
-          let filteredData = [];
+        const filtered = data.filter(entry => {
+          const entryRole = entry.role?.toLowerCase() || "";
+          const entryLocation = entry.location?.toLowerCase() || "";
+          const entryExperience = entry.experience?.toLowerCase() || "";
+          const entryCompany = entry["company name"]?.toLowerCase() || "";
 
-          // If Role is Referrer, filter by Job Seeker data
-          if (role === "referrer") {
-            filteredData = data.filter(row => {
-              const entry = {};
-              headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
-              
-              // Match the Job Seeker's data based on filters applied by Referrer
-              return (
-                (location === "" || entry.location.includes(location)) &&
-                (experience === "" || entry.experience === experience) &&
-                (company === "" || entry.company.includes(company))
-              );
-            });
-          } 
-          
-          // If Role is Job Seeker, filter by Referrer data
-          else if (role === "job seeker") {
-            filteredData = data.filter(row => {
-              const entry = {};
-              headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
-
-              // Match the Referrer's data based on filters applied by Job Seeker
-              return (
-                (location === "" || entry.location.includes(location)) &&
-                (experience === "" || entry.experience === experience) &&
-                (company === "" || entry.company.includes(company))
-              );
-            });
-          }
-
-          displayResults(filteredData, headers);
-        })
-        .catch(err => {
-          console.error(err);
-          document.getElementById("resultsContainer").innerHTML = "❌ Failed to load data. Try again.";
+          return (
+            (
+              role === "all" ||
+              (role === "job seeker" && entryRole === "referrer") ||
+              (role === "referrer" && entryRole === "job seeker")
+            ) &&
+            (location === "" || entryLocation.includes(location)) &&
+            (experience === "" || entryExperience.includes(experience)) &&
+            (company === "" || entryCompany.includes(company))
+          );
         });
-    }
 
-    function displayResults(data, headers) {
-      const resultsContainer = document.getElementById("resultsContainer");
-      let html = "<h3>Filtered Results</h3>";
-      
-      if (data.length === 0) {
-        html += "<p>No matching results found.</p>";
-      } else {
-        data.forEach(row => {
-          html += "<div class='result-item'>";
-
-          // Display fields for Job Seekers (if Role is Referrer)
-          if (document.getElementById("roleFilter").value.toLowerCase() === "referrer") {
-            html += `<p><strong>Name:</strong> ${row[headers.indexOf('name')]}</p>`;
-            html += `<p><strong>Job Title:</strong> ${row[headers.indexOf('job title')]}</p>`;
-            html += `<p><strong>Skills:</strong> ${row[headers.indexOf('skills')]}</p>`;
-            html += `<p><strong>Experience:</strong> ${row[headers.indexOf('experience')]}</p>`;
-            html += `<p><strong>Preferred Location:</strong> ${row[headers.indexOf('preferred location')]}</p>`;
-          }
-
-          // Display fields for Referrers (if Role is Job Seeker)
-          else if (document.getElementById("roleFilter").value.toLowerCase() === "job seeker") {
-            html += `<p><strong>Referrer's Name:</strong> ${row[headers.indexOf('referrer name')]}</p>`;
-            html += `<p><strong>Company Name:</strong> ${row[headers.indexOf('company name')]}</p>`;
-            html += `<p><strong>Job Title:</strong> ${row[headers.indexOf('job title')]}</p>`;
-            html += `<p><strong>Referral Link:</strong> ${row[headers.indexOf('referral link')]}</p>`;
-            html += `<p><strong>Job Description:</strong> ${row[headers.indexOf('job description')]}</p>`;
-            html += `<p><strong>Required Skills:</strong> ${row[headers.indexOf('required skills')]}</p>`;
-            html += `<p><strong>Location:</strong> ${row[headers.indexOf('location')]}</p>`;
-          }
-
-          html += "</div>";
-        });
+        displayResults(filtered, role);
+      },
+      error: function(err) {
+        console.error(err);
+        document.getElementById("resultsContainer").innerHTML = "❌ Failed to load data.";
       }
+    });
+  }
 
-      html += `<button onclick="goBackToFilters()" style="margin-top:20px; padding:10px 16px; font-size:16px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Back to Filters</button>`;
-      resultsContainer.innerHTML = html;
+  function displayResults(data, role) {
+    const resultsContainer = document.getElementById("resultsContainer");
+    let html = "<h3>Filtered Results</h3>";
+
+    if (data.length === 0) {
+      html += "<p>No matching results found.</p>";
+    } else {
+      data.forEach(entry => {
+        html += "<div class='result-item'>";
+
+        if (role === "referrer") {
+          // Show Job Seeker info
+          html += `<p><strong>Name:</strong> ${entry["name"] || ""}</p>`;
+          html += `<p><strong>Job Title:</strong> ${entry["job title"] || ""}</p>`;
+          html += `<p><strong>Skills:</strong> ${entry["skills"] || ""}</p>`;
+          html += `<p><strong>Experience:</strong> ${entry["experience"] || ""}</p>`;
+          html += `<p><strong>Preferred Location:</strong> ${entry["preferred location"] || ""}</p>`;
+        } else if (role === "job seeker") {
+          // Show Referrer info
+          html += `<p><strong>Referrer's Name:</strong> ${entry["referrer name"] || ""}</p>`;
+          html += `<p><strong>Company Name:</strong> ${entry["company name"] || ""}</p>`;
+          html += `<p><strong>Job Title:</strong> ${entry["job title"] || ""}</p>`;
+          html += `<p><strong>Referral Link:</strong> ${entry["referral link"] || ""}</p>`;
+          html += `<p><strong>Job Description:</strong> ${entry["job description"] || ""}</p>`;
+          html += `<p><strong>Required Skills:</strong> ${entry["required skills"] || ""}</p>`;
+          html += `<p><strong>Location:</strong> ${entry["location"] || ""}</p>`;
+        }
+
+        html += "</div>";
+      });
     }
 
-    function goBackToFilters() {
-      document.getElementById("filterGroup").style.display = "flex";
-      document.getElementById("roleFilter").value = "All";
-      document.getElementById("locationFilter").value = "";
-      document.getElementById("experienceFilter").value = "";
-      document.getElementById("companyFilter").value = "";
-      document.getElementById("resultsContainer").innerHTML = "";
-    }
-  </script>
+    html += `<button onclick="goBackToFilters()" style="margin-top:20px; padding:10px 16px; font-size:16px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Back to Filters</button>`;
+    resultsContainer.innerHTML = html;
+  }
+
+  function goBackToFilters() {
+    document.getElementById("filterGroup").style.display = "flex";
+    document.getElementById("roleFilter").value = "All";
+    document.getElementById("locationFilter").value = "";
+    document.getElementById("experienceFilter").value = "";
+    document.getElementById("companyFilter").value = "";
+    document.getElementById("resultsContainer").innerHTML = "";
+  }
+</script>
 
 </body>
 </html>
