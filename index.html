@@ -133,7 +133,9 @@
   </div>
 
 <script>
-  const CSV_URL = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
+  // const CSV_URL = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
+  const CSV_URL = 'https://api.allorigins.win/raw?url=https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
+
   function applyFilters() {
     const role = document.getElementById("roleFilter").value.trim().toLowerCase();
     const location = document.getElementById("locationFilter").value.trim().toLowerCase();
