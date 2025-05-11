@@ -132,6 +132,7 @@
 
   </div>
 
+
 <script>
   const CSV_URL = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
 
@@ -141,7 +142,7 @@
     const experience = document.getElementById("experienceFilter").value.trim();
     const company = document.getElementById("companyFilter").value.trim().toLowerCase();
 
-    // Validate if experience is a valid number (if entered)
+    // Validate experience (must be a number if provided)
     if (experience && !/^\d+$/.test(experience)) {
       alert("Experience must be a valid number.");
       return;
@@ -156,30 +157,33 @@
       .then(text => {
         const rows = text.trim().split('\n').map(row => row.split(','));
         const headers = rows[0].map(h => h.trim().toLowerCase());  // Normalize headers to lowercase
-        const data = rows.slice(1);  // Get data excluding header row
+        const data = rows.slice(1);  // Get data excluding the header row
 
-        console.log("Fetched Data:", data);  // Log fetched data for debugging
-        console.log("Headers:", headers);    // Log headers for debugging
+        console.log("Fetched Data:", data);  // Log the fetched data to check format
+        console.log("Headers:", headers);    // Log the headers for debugging
 
         let filteredData = [];
 
-        // Filter the data based on available filters
+        // Filter the data based on applied filters
         filteredData = data.filter(row => {
           const entry = {};
           headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
 
-          // Check if any filter is applied, and apply the filter if it is.
+          console.log("Checking row:", entry);  // Log each row to inspect data
+
+          // Match based on the role, location, experience, and company
+          const matchesRole = role === "" || entry.role?.includes(role);
           const matchesLocation = location === "" || entry.location?.includes(location);
           const matchesExperience = experience === "" || entry.experience?.includes(experience);
           const matchesCompany = company === "" || entry.company?.includes(company);
-          const matchesRole = role === "" || entry.role?.includes(role);  // Apply role filter
 
-          // Only show rows that match any of the filters applied (i.e., one or more filters)
-          return matchesLocation || matchesExperience || matchesCompany || matchesRole;
+          // Return true if any filter is matched
+          return matchesRole || matchesLocation || matchesExperience || matchesCompany;
         });
 
-        console.log("Filtered Data:", filteredData);  // Log filtered data for debugging
+        console.log("Filtered Data:", filteredData);  // Log the filtered data for debugging
 
+        // Display results
         displayResults(filteredData, headers);
       })
       .catch(err => {
@@ -235,6 +239,7 @@
     document.getElementById("resultsContainer").innerHTML = "";
   }
 </script>
+
 
 </body>
 </html>
