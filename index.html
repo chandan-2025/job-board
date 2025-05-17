@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -103,143 +102,139 @@
       }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
 
-  <header>
-    <h1>Community Job Board</h1>
-  </header>
-
-  <div class="container">
-
-    <div class="filter-group" id="filterGroup">
-      <select id="roleFilter">
-        <option value="All">All Roles</option>
-        <option value="Job Seeker">Job Seeker</option>
-        <option value="Referrer">Referrer</option>
-      </select>
-
-      <input type="text" id="locationFilter" placeholder="Location" />
-      <input type="text" id="experienceFilter" placeholder="Experience (e.g., 2 years)" />
-      <input type="text" id="companyFilter" placeholder="Company Name" />
-
-      <button onclick="applyFilters()">Search</button>
-    </div>
-
-    <div id="resultsContainer"></div>
-
+  <div id="searchForm">
+    <h2>Search Referrals or Job Seekers</h2>
+    <select id="roleSelector">
+      <option value="">Select Role</option>
+      <option value="Job Seeker">Job Seeker</option>
+      <option value="Referrer">Referrer</option>
+    </select>
+    <input type="text" id="locationFilter" placeholder="Location" />
+    <input type="text" id="experienceFilter" placeholder="Experience (e.g., 2 years)" />
+    <input type="text" id="companyFilter" placeholder="Company Name" />
+    <button onclick="submitSearch()">Search</button>
   </div>
 
+  <div id="resultsPage" style="display: none;">
+    <div id="resultsContainer"></div>
+    <div id="paginationControls"></div>
+    <div id="backButtonContainer">
+      <button onclick="goBackToMainPage()">⬅ Back to Main Page</button>
+    </div>
+  </div>
 
 <script>
-  const CSV_URL = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
+ const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS47IVX2PkhWMfZO57GjftGkUJSAX1pBMxJ5FUou4RY86T3cfpksGzD9hICU6R_VIYIPgeOu66g-fXS/pub?output=csv';
+let allData = [];
+let currentPage = 1;
+const itemsPerPage = 5;
 
-  function applyFilters() {
-    const role = document.getElementById("roleFilter").value.trim().toLowerCase();
-    const location = document.getElementById("locationFilter").value.trim().toLowerCase();
-    const experience = document.getElementById("experienceFilter").value.trim();
-    const company = document.getElementById("companyFilter").value.trim().toLowerCase();
+function submitSearch() {
+  const container = document.getElementById('resultsContainer');
+  container.innerHTML = "Loading...";
 
-    // Validate experience (must be a number if provided)
-    if (experience && !/^\d+$/.test(experience)) {
-      alert("Experience must be a valid number.");
-      return;
+  Papa.parse(CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function (results) {
+      allData = filterData(results.data);
+      currentPage = 1;
+      showPage(currentPage);
+      document.getElementById('searchForm').style.display = 'none';
+      document.getElementById('resultsPage').style.display = 'block';
+    },
+    error: function (err) {
+      container.innerHTML = `❌ Failed to load data: ${err.message}`;
     }
+  });
+}
 
-    // Hide the filter group while fetching data
-    document.getElementById("filterGroup").style.display = "none";
-    document.getElementById("resultsContainer").innerHTML = "Loading...";  // Show loading message
+function filterData(data) {
+  const role = document.getElementById('roleSelector').value.toLowerCase();
+  const location = document.getElementById('locationFilter').value.toLowerCase();
+  const experience = document.getElementById('experienceFilter').value.toLowerCase();
+  const company = document.getElementById('companyFilter').value.toLowerCase();
 
-    fetch(CSV_URL)
-      .then(response => response.text())
-      .then(text => {
-        const rows = text.trim().split('\n').map(row => row.split(','));
-        const headers = rows[0].map(h => h.trim().toLowerCase());  // Normalize headers to lowercase
-        const data = rows.slice(1);  // Get data excluding the header row
+  return data.filter(row => {
+    const roleInData = (row["Are you seeker or refer?"] || "").toLowerCase();
+    const isOpposite =
+      role === "job seeker" ? roleInData === "referrer" :
+      role === "referrer" ? roleInData === "job seeker" : true;
 
-        console.log("Fetched Data:", data);  // Log the fetched data to check format
-        console.log("Headers:", headers);    // Log the headers for debugging
+    const matchLocation = !location || ((row["Location"] || row["Preferred Location"] || "").toLowerCase().includes(location));
+    const matchExperience = !experience || (row["Experience"] || "").toLowerCase().includes(experience);
+    const matchCompany = !company || (row["Company Name"] || "").toLowerCase().includes(company);
 
-        let filteredData = [];
+    return isOpposite && matchLocation && matchExperience && matchCompany;
+  });
+}
 
-        // Filter the data based on applied filters
-        filteredData = data.filter(row => {
-          const entry = {};
-          headers.forEach((h, i) => entry[h] = row[i]?.trim().toLowerCase() || "");
+function showPage(page) {
+  const container = document.getElementById('resultsContainer');
+  const pagination = document.getElementById('paginationControls');
+  container.innerHTML = "";
+  pagination.innerHTML = "";
 
-          console.log("Checking row:", entry);  // Log each row to inspect data
+  const start = (page - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  const pageItems = allData.slice(start, end);
 
-          // Match based on the role, location, experience, and company
-          const matchesRole = role === "" || entry.role?.includes(role);
-          const matchesLocation = location === "" || entry.location?.includes(location);
-          const matchesExperience = experience === "" || entry.experience?.includes(experience);
-          const matchesCompany = company === "" || entry.company?.includes(company);
-
-          // Return true if any filter is matched
-          return matchesRole || matchesLocation || matchesExperience || matchesCompany;
-        });
-
-        console.log("Filtered Data:", filteredData);  // Log the filtered data for debugging
-
-        // Display results
-        displayResults(filteredData, headers);
-      })
-      .catch(err => {
-        console.error("Error fetching CSV:", err);
-        document.getElementById("resultsContainer").innerHTML = "❌ Failed to load data. Try again.";
-      });
+  if (pageItems.length === 0) {
+    container.innerHTML = "<p>No matching results found.</p>";
+    return;
   }
 
-  function displayResults(data, headers) {
-    const resultsContainer = document.getElementById("resultsContainer");
-    let html = "<h3>Filtered Results</h3>";
+  pageItems.forEach(row => {
+    const div = document.createElement('div');
+    div.className = "result-item";
+    div.innerHTML = `
+      <strong>Name:</strong> ${row["Name"] || ""}<br>
+      <strong>Job Title:</strong> ${row["Job Title"] || row["Job Title Preference"] || ""}<br>
+      <strong>Skills:</strong> ${row["Skills"] || row["Required Skills"] || ""}<br>
+      <strong>Experience:</strong> ${row["Experience"] || ""}<br>
+      <strong>Company:</strong> ${row["Company Name"] || ""}<br>
+      <strong>Location:</strong> ${row["Location"] || row["Preferred Location"] || ""}<br>
+      <strong>Referral Link:</strong> ${row["Referral Link"] || ""}<br>
+      <strong>Referrer Name:</strong> ${row["Referrer Name"] || ""}<br>
+      <strong>Job Description:</strong> ${row["Job Description"] || ""}
+    `;
+    container.appendChild(div);
+  });
 
-    if (data.length === 0) {
-      html += "<p>No matching results found.</p>";
-    } else {
-      data.forEach(row => {
-        html += "<div class='result-item'>";
-
-        // Display fields for Job Seekers (if Role is Referrer)
-        if (document.getElementById("roleFilter").value.toLowerCase() === "referrer") {
-          html += `<p><strong>Name:</strong> ${row[headers.indexOf('name')]}</p>`;
-          html += `<p><strong>Job Title:</strong> ${row[headers.indexOf('job title')]}</p>`;
-          html += `<p><strong>Skills:</strong> ${row[headers.indexOf('skills')]}</p>`;
-          html += `<p><strong>Experience:</strong> ${row[headers.indexOf('experience')]}</p>`;
-          html += `<p><strong>Preferred Location:</strong> ${row[headers.indexOf('preferred location')]}</p>`;
-        }
-
-        // Display fields for Referrers (if Role is Job Seeker)
-        else if (document.getElementById("roleFilter").value.toLowerCase() === "job seeker") {
-          html += `<p><strong>Referrer's Name:</strong> ${row[headers.indexOf('referrer name')]}</p>`;
-          html += `<p><strong>Company Name:</strong> ${row[headers.indexOf('company name')]}</p>`;
-          html += `<p><strong>Job Title:</strong> ${row[headers.indexOf('job title')]}</p>`;
-          html += `<p><strong>Referral Link:</strong> ${row[headers.indexOf('referral link')]}</p>`;
-          html += `<p><strong>Job Description:</strong> ${row[headers.indexOf('job description')]}</p>`;
-          html += `<p><strong>Required Skills:</strong> ${row[headers.indexOf('required skills')]}</p>`;
-          html += `<p><strong>Location:</strong> ${row[headers.indexOf('location')]}</p>`;
-        }
-
-        html += "</div>";
-      });
-    }
-
-    html += `<button onclick="goBackToFilters()" style="margin-top:20px; padding:10px 16px; font-size:16px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Back to Filters</button>`;
-    resultsContainer.innerHTML = html;
+  const totalPages = Math.ceil(allData.length / itemsPerPage);
+  for (let i = 1; i <= totalPages; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    btn.onclick = () => {
+      currentPage = i;
+      showPage(i);
+    };
+    if (i === page) btn.disabled = true;
+    pagination.appendChild(btn);
   }
+}
 
-  function goBackToFilters() {
-    document.getElementById("filterGroup").style.display = "flex";
-    document.getElementById("roleFilter").value = "";
-    document.getElementById("locationFilter").value = "";
-    document.getElementById("experienceFilter").value = "";
-    document.getElementById("companyFilter").value = "";
-    document.getElementById("resultsContainer").innerHTML = "";
-  }
+function goBackToMainPage() {
+  document.getElementById('resultsPage').style.display = 'none';
+  document.getElementById('searchForm').style.display = 'block';
+  document.getElementById('resultsContainer').innerHTML = "";
+  document.getElementById('paginationControls').innerHTML = "";
+  document.getElementById('roleSelector').value = "";
+  document.getElementById('locationFilter').value = "";
+  document.getElementById('experienceFilter').value = "";
+  document.getElementById('companyFilter').value = "";
+}
 </script>
-
 
 </body>
 </html>
